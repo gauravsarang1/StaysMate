@@ -1,0 +1,124 @@
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  OWNER
+}
+
+enum Stay_Type {
+  PG
+  Room
+  LATE_NIGHT
+  HOSTEL
+}
+
+enum Gender_Pref {
+    MALE
+    FEMALE
+    OTHER
+    ANY
+}
+
+enum Room_Status {
+  AVAILABLE
+  BOOKED
+  UNAVAILABLE
+}
+
+enum Room_Type {
+  SINGLE
+  DOUBLE
+  TRIPLE
+  MORE
+  DELUX
+}
+
+enum Room_Mate_Status {
+  OPENED
+  CLOSED
+}
+
+model User {
+  id            Int     @id @default(autoincrement())
+  name          String
+  email         String  @unique
+  email_verified  Boolean   @default(false)
+  role          Role    @default(USER)
+  password_hash String?
+  phone         String?
+  profile_pic   String?
+  background_pic  String?
+  otp           String?
+  otp_expiry    DateTime?             
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  stays         Stay[]
+  Reviews       Reviews[]
+  room_mate_post  RoomMatePost[]
+}
+
+model Stay {
+  id          Int     @id @default(autoincrement())
+  owner_id    Int
+  owner       User    @relation(fields: [owner_id], references: [id])
+  name        String
+  address     String
+  latitude    Float?
+  longitude   Float?
+  facilities  Json?
+  photos      Json?
+  contact     Json?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  stay_room   StayRoom[]
+  Reviews     Reviews[]
+  room_mate_post  RoomMatePost[]
+}
+
+model StayRoom {
+  id          Int      @id @default(autoincrement())
+  stay_id     Int
+  room_type   Room_Type      @default(TRIPLE)
+  stay        Stay     @relation(fields: [stay_id], references: [id])  
+  price       Float    
+  capacity    Int      
+  facilities  Json?     
+  photos      Json?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model Reviews {
+  id        Int   @id @default(autoincrement())
+  stay_id   Int
+  stay      Stay  @relation(fields: [stay_id], references: [id])
+  user_id   Int
+  user      User  @relation(fields: [user_id], references: [id])
+  comment   String
+  rating    Int?  @default(1)
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+}
+
+model RoomMatePost {
+  id          Int   @id @default(autoincrement())
+  user_id     Int
+  user        User  @relation(fields: [user_id], references: [id])
+  stay_id     Int
+  stay        Stay  @relation(fields: [stay_id], references: [id])
+  description String
+  status      Room_Mate_Status    @default(OPENED)
+  preferences Json?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+}
