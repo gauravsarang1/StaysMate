@@ -1,11 +1,23 @@
-import { prisma } from "../../../../prisma/prisma";
+import { prisma } from "@/utils/prisma";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import bcrypt from "bcryptjs";
 import sendVerificationEmail from "@/helpers/sendVerificationEmail";
+import * as z from "zod";
+import { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+
+const createUserScema = z.object({
+    name: z.coerce.string(),
+    email: z.email(),
+    phone: z.coerce.string(),
+    password: z.coerce.string()
+})
 
 export async function POST(request: Request) {
     try {
-        const {name, email, phone, password} = await request.json()
+        const body = await request.json();
+        const parsedBody = createUserScema.parse(body);
+        const {name, email, phone, password} = parsedBody;
         if(!name || !email || !phone || !password) {
             return errorResponse('all fields are required', 400)
         }
@@ -59,10 +71,19 @@ export async function POST(request: Request) {
     }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const token = await getToken({req});
+        if(!token?.id) return errorResponse('Unauthorized request - Token not found', 401)
+        const parsedToken = Number(token.id);
+
+        const admin = await prisma.user.findUnique({
+            where: { id: parsedToken}
+        });
+        if(admin && admin.role !== 'ADMIN') return errorResponse('Forbidden - Admin protected routes', 403);
+
         const users = await prisma.user.findMany()
-        if(!users) return errorResponse('No users found in db', 404)
+        if(users && users.length === 0) return errorResponse('No users found in db', 404);
 
         return successResponse(users, 'All users fetched from database', 200)
     } catch (error) {

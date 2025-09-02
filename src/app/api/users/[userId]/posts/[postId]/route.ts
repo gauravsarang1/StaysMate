@@ -1,24 +1,40 @@
-import { prisma } from "../../../../../prisma/prisma";
+import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
+import * as z from 'zod'
+import parsedIds from "@/utils/parsedIds";
 
-interface updatedePostDataProps {
-    description?: string,
-    preferences?: object,
-    status?: Status
-}
+const updatePostSchema = z.object({
+    description: z.coerce.string().optional(),
+    preferences: z.record(z.any()).optional(),
+    status: z.enum(['OPENED', 'CLOSED']).optional()
+}).refine((data) => data.description || data.preferences || data.status, {
+    message: 'At least one field is required'
+});
 
-type Status = 'OPENED' | 'CLOSED';
+export async function GET(req: NextRequest, context: {
+    params: Promise<{userId: string, postId: string}>
+}) {
+    const { userId, postId } = await context.params;
 
-export async function GET(req: NextRequest, { params }: { params: { id: string}}) {
     try {
-        const id = Number(params.id);
-        if(isNaN(id) || id <= 0) return errorResponse('Invalid Post Id', 400);
+        const {parsedArg1: parsedUserId, parsedArg2: parsedPostId} = parsedIds(userId, postId);
 
         const post = await prisma.roomMatePost.findUnique({
-            where: { id }
+            where: { 
+                id: parsedPostId,
+                user_id: parsedUserId
+            },
+            include: { user: {
+                select: {
+                    id: true,
+                    name: true,
+                    profile_pic: true
+                }
+            }}
         });
+        if(!post) return errorResponse('Post not found', 404);
 
         return successResponse(post, 'Post found successfully');
     } catch (error) {
@@ -28,33 +44,36 @@ export async function GET(req: NextRequest, { params }: { params: { id: string}}
 };
 
 export async function PUT(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{userId: string, postId: string}>
 }) {
-    const id = (await context.params).id;
+    const {userId, postId} = (await context.params);
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found', 401);
 
-        const roommate_post_id = Number(id);
-        if(isNaN(roommate_post_id) || roommate_post_id <= 0) return errorResponse('Invalid Post Id', 400);
+        const {parsedArg1: parsedUserId, parsedArg2: parsedPostId} = parsedIds(userId, postId);
 
         const body = await req.json();
-        const { description, preferences, status} = body;
+        const parsedBody = updatePostSchema.parse(body);
+        const { description, preferences, status} = parsedBody;
         if(!description && !preferences && !status) return errorResponse('At least one field is required to update the Post', 400);
 
         const existingPost = await prisma.roomMatePost.findUnique({
-            where: { id: roommate_post_id }
+            where: { 
+                id: parsedPostId,
+                user_id: parsedUserId
+            }
         });
         if(existingPost && existingPost.user_id !== Number(token.id)) return errorResponse('Forbidden - you  can not update this post', 403);
 
-        const updatedePostData: updatedePostDataProps = {}
+        const updatedePostData: any = {}
         if(description !== undefined) updatedePostData.description = description;
         if(preferences !== undefined) updatedePostData.preferences = preferences;
         if(status !== undefined) updatedePostData.status = status;
 
         const updatedPost = await prisma.roomMatePost.update({
-            where: { id: roommate_post_id },
+            where: { id: parsedPostId },
             data: updatedePostData
         });
 
@@ -66,24 +85,26 @@ export async function PUT(req: NextRequest, context: {
 };
 
 export async function DELETE(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ userId: string, postId: string}>
 }) {
-    const id = (await context.params).id;
+    const { userId, postId} = (await context.params);
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - Token not found', 401);
 
-        const roommate_post_id = Number(id);
-        if(isNaN(roommate_post_id) || roommate_post_id <= 0) return errorResponse('Invalid Post Id', 400);
+        const {parsedArg1: parsedUserId, parsedArg2: parsedPostId} = parsedIds(userId, postId);
 
         const existingPost = await prisma.roomMatePost.findUnique({
-            where: { id: roommate_post_id }
+            where: { 
+                id: parsedPostId,
+                user_id: parsedUserId
+            }
         });
-        if(!existingPost || existingPost.user_id !== Number(token.id) ) return errorResponse('Forbidden - you can not delete this post', 403);
+        if(existingPost && existingPost.user_id !== Number(token.id) ) return errorResponse('Forbidden - you can not delete this post', 403);
 
         const deletedPost = await prisma.roomMatePost.delete({
-            where: { id: roommate_post_id }
+            where: { id: parsedPostId }
         });
 
         return successResponse(deletedPost, 'Post deleted successfully');

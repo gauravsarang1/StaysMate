@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google";
-import { prisma } from "../../../../../prisma/prisma";
+import { prisma } from "@/utils/prisma";
 import bcrypt from "bcryptjs";
 import  CredentialsProvider  from "next-auth/providers/credentials";
 
@@ -40,12 +40,7 @@ export const authOptions: NextAuthOptions = {
                         throw new Error("Invalid password");
                     }
                     return {
-                        id: user.id.toString(),
-                        email: user.email,
-                        email_verified: user.email_verified,
-                        name: user.name,
-                        profile_pic: user.profile_pic,
-                        role: user.role,
+                        id: user.id
                     };
                 } catch (error) {
                     throw new Error(`Error fetching user from database, ${error}`);
@@ -84,11 +79,6 @@ export const authOptions: NextAuthOptions = {
         async jwt({ token, user}) {
             if(user) {
                 token.id = user.id
-                token.email = user.email
-                token.email_verified = user.email_verified
-                token.name = user.name
-                token.profile_pic = user.profile_pic
-                token.role = user.role
             }
             return token
         },
@@ -96,11 +86,6 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token}) {
             if(token) {
                 session.user.id = token.id
-                session.user.email = token.email
-                session.user.email_verified = token.email_verified
-                session.user.name = token.name
-                session.user.profile_pic = token.profile_pic
-                session.user.role = token.role
             }
             return session
         },

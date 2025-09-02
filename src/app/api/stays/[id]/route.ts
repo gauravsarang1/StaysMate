@@ -1,4 +1,4 @@
-import { prisma } from "../../../../../prisma/prisma";
+import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";

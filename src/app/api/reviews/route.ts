@@ -1,4 +1,4 @@
-import { prisma } from "../../../../prisma/prisma";
+import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
@@ -8,6 +8,11 @@ export async function GET(req: NextRequest) {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
         console.log(token)
+
+        const admin = await prisma.user.findUnique({
+            where: { id: Number(token.id)}
+        });
+        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
 
         const reviews = await prisma.reviews.findMany();
         if(reviews.length === 0) return errorResponse('No reviews found in database', 404);
@@ -23,6 +28,11 @@ export async function POST(req: NextRequest) {
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
+
+        const admin = await prisma.user.findUnique({
+            where: { id: Number(token.id)}
+        });
+        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
 
         const body = await req.json();
         const { user_id, stay_id, comment, rating} = body;

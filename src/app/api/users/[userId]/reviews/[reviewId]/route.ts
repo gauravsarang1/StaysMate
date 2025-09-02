@@ -2,31 +2,40 @@ import { prisma } from "@/utils/prisma";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
+import * as z from 'zod'
+import parsedIds from "@/utils/parsedIds";
 
-interface updatedDataProps {
-    comment?: string,
-    rating?: number
-}
+const updateReviewSchema = z.object({
+    comment: z.string().optional(),
+    rating: z.number().min(1).max(5).optional()
+}).refine((data) => data.comment || data.rating, {
+    message: 'At least one field is required'
+});
 
 export async function GET(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ userId: string, reviewId: string}>
 }) {
-    const id = (await context.params).id;
+    const userId = (await context.params).userId;
+    const reviewId = (await context.params).reviewId;
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized request - Token not found', 401);
 
-        const review_id = Number(id);
-        if(isNaN(review_id) || review_id <= 0) return errorResponse('Invalid Review Id', 400);
-
-        const admin = await prisma.user.findUnique({
-            where: { id: Number(token.id)}
-        });
-        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
+        const { parsedArg1: parsedUserId, parsedArg2: parsedReviewId} = parsedIds(userId, reviewId);
 
         const review = await prisma.reviews.findUnique({
-            where: { id: review_id }
+            where: { 
+                id: parsedReviewId,
+                user_id: parsedUserId
+            },
+            include: { user: {
+                select: {
+                    name: true,
+                    id: true,
+                    profile_pic: true
+                }
+            }}
         });
         if(!review) return errorResponse('No Review found', 404);
 
@@ -38,39 +47,35 @@ export async function GET(req: NextRequest, context: {
 };
 
 export async function PUT(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ userId: string, reviewId: string}>
 }) {
-    const id = (await context.params).id;
+    const userId = (await context.params).userId;
+    const reviewId = (await context.params).reviewId;
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found', 401);
 
-        const admin = await prisma.user.findUnique({
-            where: { id: Number(token.id)}
-        });
-        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
-
-        const review_id = Number(id);
-        if(isNaN(review_id) || review_id <= 0) return errorResponse('Invalid Review Id', 400);
+        const { parsedArg1: parsedUserId, parsedArg2: parsedReviewId} = parsedIds(userId, reviewId);
 
         const body = await req.json();
-        const { comment, rating} = body;
+        const parsedBody = updateReviewSchema.parse(body);
+        const { comment, rating} = parsedBody;
         if(!comment && !rating) return errorResponse('At least one field is required to update the review', 400);
 
         const existingReview = await prisma.reviews.findUnique({
-            where: { id: review_id }
+            where: { id: parsedReviewId }
         });
         if(!existingReview) return errorResponse('Review not found', 404);
 
         if(existingReview.user_id !== Number(token.id)) return errorResponse('forbidden - you can not update this review', 403);
 
-        const updatedData: updatedDataProps = {};
+        const updatedData: any = {};
         if(comment !== undefined) updatedData.comment = comment;
         if(rating !== undefined) updatedData.rating = rating;
 
         const updatedReview = await prisma.reviews.update({
-            where: { id: review_id},
+            where: { id: parsedReviewId, user_id: parsedUserId},
             data: updatedData
         });
 
@@ -82,34 +87,40 @@ export async function PUT(req: NextRequest, context: {
 };
 
 export async function DELETE(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ userId: string, reviewId: string}>
 }) {
-    const id = (await context.params).id;
+    const userId = (await context.params).userId;
+    const reviewId = (await context.params).reviewId;
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found', 401);
 
-        const admin = await prisma.user.findUnique({
-            where: { id: Number(token.id)}
-        });
-        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
+        const { parsedArg1: parsedUserId, parsedArg2: parsedReviewId} = parsedIds(userId, reviewId);
 
-        const review_id = Number(id);
-        if(isNaN(review_id) || review_id <= 0) return errorResponse('Invalid Review Id', 400);
+        const user = await prisma.user.findUnique({
+            where: { id: parsedUserId}
+        });
+        if(!user) return errorResponse('User not found', 404);
         
         const existingReview = await prisma.reviews.findUnique({
-            where: { id: review_id }
+            where: { 
+                id: parsedReviewId,
+                user_id: parsedUserId
+            }
         });
         if(!existingReview) return errorResponse('No Review found', 404);
 
-        if(existingReview.user_id !== Number(token.id)) return errorResponse('forbidden - you can not delete this review');
+        if(existingReview.user_id !== Number(token.id)) return errorResponse('forbidden - you can not delete this review', 403);
 
-        const review = await prisma.reviews.delete({
-            where: { id: review_id }
+        await prisma.reviews.delete({
+            where: { 
+                id: parsedReviewId,
+                user_id: parsedUserId
+            }
         });
 
-        return successResponse(review, 'Review deleted successfully');    
+        return successResponse({}, 'Review deleted successfully');    
     } catch (error) {
         console.error('Internal server error', error instanceof Error ? error.message : error);
         return errorResponse('Internal server error',500, {error});
