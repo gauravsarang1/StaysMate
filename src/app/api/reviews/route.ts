@@ -7,7 +7,6 @@ export async function GET(req: NextRequest) {
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
-        console.log(token)
 
         const admin = await prisma.user.findUnique({
             where: { id: Number(token.id)}

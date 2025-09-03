@@ -2,15 +2,7 @@ import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
-import * as z from "zod";
-
-const updatePostSchema = z.object({
-    description: z.coerce.string().optional(),
-    preferences: z.record(z.any()).optional(),
-    status: z.enum(['OPENED', 'CLOSED']).optional().default('OPENED')
-}).refine((data) => data.description || data.preferences || data.status, {
-    message: 'At least one field is required'
-});
+import { updatePostSchema } from "@/schema/schema";
 
 export async function GET(req: NextRequest, context: {
     params: Promise<{ id: string}>
@@ -108,13 +100,10 @@ export async function DELETE(req: NextRequest, context: {
         const roommate_post_id = Number(id);
         if(isNaN(roommate_post_id) || roommate_post_id <= 0) return errorResponse('Invalid Post Id', 400);
 
-        const existingPost = await prisma.roomMatePost.findUnique({
-            where: { id: roommate_post_id }
-        });
-
         const deletedPost = await prisma.roomMatePost.delete({
             where: { id: roommate_post_id }
         });
+        if(!deletedPost) return errorResponse('Post not found', 404);
 
         return successResponse(deletedPost, 'Post deleted successfully');
     } catch (error) {

@@ -2,16 +2,8 @@ import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
-import * as z from 'zod'
 import parsedIds from "@/utils/parsedIds";
-
-const updatePostSchema = z.object({
-    description: z.coerce.string().optional(),
-    preferences: z.record(z.any()).optional(),
-    status: z.enum(['OPENED', 'CLOSED']).optional()
-}).refine((data) => data.description || data.preferences || data.status, {
-    message: 'At least one field is required'
-});
+import { updatePostSchema } from "@/schema/schema"
 
 export async function GET(req: NextRequest, context: {
     params: Promise<{userId: string, postId: string}>
@@ -26,13 +18,23 @@ export async function GET(req: NextRequest, context: {
                 id: parsedPostId,
                 user_id: parsedUserId
             },
-            include: { user: {
-                select: {
-                    id: true,
-                    name: true,
-                    profile_pic: true
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        profile_pic: true
+                    }
+                },
+                stay: {
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                        photos: true
+                    }
                 }
-            }}
+            }
         });
         if(!post) return errorResponse('Post not found', 404);
 

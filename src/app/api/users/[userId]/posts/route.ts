@@ -3,14 +3,9 @@ import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
 import * as z from 'zod';
+import { createPostSchema } from "@/schema/schema";
 
 const idSchema = z.coerce.number();
-
-const createPostSchema = z.object({
-    stay_id: z.coerce.number(),
-    description: z.coerce.string(),
-    preferences: z.record(z.any()).optional()
-})
 
 export async function GET(req: NextRequest, context: {
     params: Promise<{ userId: string}>
@@ -37,7 +32,7 @@ export async function GET(req: NextRequest, context: {
                 }
             }}
         });
-        if(posts.length === 0) return successResponse({}, 'No posts found in database', 404);
+        if(posts.length === 0) return successResponse({}, 'No posts found releted to this user', 404);
         
         return successResponse(posts, 'all Posts fetched successfully');
     } catch (error) {

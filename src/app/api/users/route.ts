@@ -2,16 +2,9 @@ import { prisma } from "@/utils/prisma";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import bcrypt from "bcryptjs";
 import sendVerificationEmail from "@/helpers/sendVerificationEmail";
-import * as z from "zod";
 import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-
-const createUserScema = z.object({
-    name: z.coerce.string(),
-    email: z.email(),
-    phone: z.coerce.string(),
-    password: z.coerce.string()
-})
+import { createUserScema } from "@/schema/schema";
 
 export async function POST(request: Request) {
     try {

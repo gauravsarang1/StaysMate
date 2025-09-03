@@ -3,14 +3,9 @@ import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { prisma } from "@/utils/prisma";
 import { getToken } from "next-auth/jwt";
 import * as z from "zod";
+import { createReviewSchema } from "@/schema/schema";
 
 const idSchema = z.coerce.number();
-
-const createReviewSchema = z.object({
-    stay_id: z.coerce.number(),
-    comment: z.coerce.string(),
-    rating: z.coerce.number().min(1).max(5).default(1)
-});
 
 export async function GET(req: NextRequest, context: {
     params: Promise<{ userId: string}>
@@ -32,7 +27,7 @@ export async function GET(req: NextRequest, context: {
                 }
             }
         });
-        if(user_reviews && user_reviews.length === 0) successResponse({}, 'No reviews found', 404);
+        if(user_reviews && user_reviews.length === 0) successResponse({}, 'No reviews found found releted to this user', 404);
 
         return successResponse(user_reviews, 'User reviews fetched successfully');
     } catch (error) {

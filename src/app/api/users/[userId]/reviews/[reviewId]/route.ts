@@ -2,15 +2,8 @@ import { prisma } from "@/utils/prisma";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
-import * as z from 'zod'
 import parsedIds from "@/utils/parsedIds";
-
-const updateReviewSchema = z.object({
-    comment: z.string().optional(),
-    rating: z.number().min(1).max(5).optional()
-}).refine((data) => data.comment || data.rating, {
-    message: 'At least one field is required'
-});
+import { updateReviewSchema } from "@/schema/schema";
 
 export async function GET(req: NextRequest, context: {
     params: Promise<{ userId: string, reviewId: string}>

@@ -2,11 +2,10 @@ import { prisma } from "@/utils/prisma";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
+import { updateReviewSchema } from "@/schema/schema";
+import * as z from 'zod';
 
-interface updatedDataProps {
-    comment?: string,
-    rating?: number
-}
+const idSchema = z.coerce.number();
 
 export async function GET(req: NextRequest, context: {
     params: Promise<{ id: string}>
@@ -17,8 +16,7 @@ export async function GET(req: NextRequest, context: {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized request - Token not found', 401);
 
-        const review_id = Number(id);
-        if(isNaN(review_id) || review_id <= 0) return errorResponse('Invalid Review Id', 400);
+        const review_id = idSchema.parse(id);
 
         const admin = await prisma.user.findUnique({
             where: { id: Number(token.id)}
@@ -55,7 +53,8 @@ export async function PUT(req: NextRequest, context: {
         if(isNaN(review_id) || review_id <= 0) return errorResponse('Invalid Review Id', 400);
 
         const body = await req.json();
-        const { comment, rating} = body;
+        const parsedBody = updateReviewSchema.parse(body);
+        const { comment, rating} = parsedBody;
         if(!comment && !rating) return errorResponse('At least one field is required to update the review', 400);
 
         const existingReview = await prisma.reviews.findUnique({
@@ -65,7 +64,7 @@ export async function PUT(req: NextRequest, context: {
 
         if(existingReview.user_id !== Number(token.id)) return errorResponse('forbidden - you can not update this review', 403);
 
-        const updatedData: updatedDataProps = {};
+        const updatedData: any = {};
         if(comment !== undefined) updatedData.comment = comment;
         if(rating !== undefined) updatedData.rating = rating;
 

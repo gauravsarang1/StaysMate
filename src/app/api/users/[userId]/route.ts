@@ -3,14 +3,7 @@ import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { prisma } from "@/utils/prisma";
 import { getToken } from "next-auth/jwt";
 import  * as z from "zod";
-
-const updateUserSchema = z.object({
-  email: z.coerce.string().optional(),
-  phone: z.coerce.string().optional(),
-  name: z.coerce.string().optional()
-}).refine((data) => data.email || data.name || data.phone, {
-  message: 'At least one field is required'
-})
+import { updateUserSchema } from "@/schema/schema";
 
 const idSchema = z.coerce.number();
 

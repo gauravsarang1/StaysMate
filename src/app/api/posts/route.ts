@@ -2,14 +2,8 @@ import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
-import * as z from "zod";
+import { createPostAdminSchema } from "@/schema/schema";
 
-const createUserAdminSchema = z.object({
-    user_id: z.coerce.number(),
-    stay_id: z.coerce.number(),
-    description: z.coerce.string(),
-    preferences: z.record(z.any()).optional()
-})
 
 export async function GET(req: NextRequest) {
     try {
@@ -59,7 +53,7 @@ export async function POST(req: NextRequest) {
         if(posts.length === 0) return errorResponse('No posts found in database', 404);
 
         const body = await req.json();
-        const parsedBody = createUserAdminSchema.parse(body);
+        const parsedBody = createPostAdminSchema.parse(body);
         const { user_id, stay_id, description, preferences } = parsedBody;
 
         // Validation

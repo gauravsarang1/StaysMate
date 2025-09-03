@@ -2,6 +2,9 @@ import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
+import { createStaySchema } from "@/schema/schema";
+
+
 
 export async function GET() {
     try {
@@ -19,14 +22,17 @@ export async function POST(reqest:NextRequest) {
     try {
         const token = await getToken({req: reqest});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
+        const parsedTokenId = Number(token.id)
         
-        const {name, address, owner_id, latitude, longitude } = await reqest.json();
-        if(!name || !address || !owner_id || !latitude || !longitude) return errorResponse('All fields are required', 400);
+        const body = await reqest.json();
+        const parsedBody = createStaySchema.parse(body);
+        const {name, address, latitude, longitude } = parsedBody;
+        if(!name || !address  || !latitude || !longitude) return errorResponse('All fields are required', 400);
 
         const owner = await prisma.user.findUnique({
-            where: { id: owner_id}
+            where: { id: parsedTokenId}
         });
-        if(!owner) return errorResponse('User not found with this Id', 404);
+        if(owner) return errorResponse('User not found with this Id', 404);
 
         const newStay = await prisma.stay.create({
             data: {
@@ -34,7 +40,7 @@ export async function POST(reqest:NextRequest) {
                 address,
                 latitude,
                 longitude,
-                owner_id: Number(owner_id)
+                owner_id: parsedTokenId
             }
         });
 

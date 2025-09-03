@@ -2,30 +2,36 @@ import { prisma } from "@/utils/prisma";
 import { NextRequest } from "next/server";
 import { errorResponse, successResponse } from "@/utils/apiResponse";
 import { getToken } from "next-auth/jwt";
-import * as z from "zod";
 import { updateRoomSchema } from "@/schema/schema";
-
-const idSchema = z.coerce.number();
+import parsedIds from "@/utils/parsedIds";
 
 export async function GET(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ stayId: string, roomId: string}>
 }) {
-    const id = (await context.params).id;
+    const { stayId, roomId} = await context.params;
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
 
-        const admin = await prisma.user.findUnique({
-            where: { id: Number(token.id)}
-        });
-        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
-
-        const room_id = idSchema.parse(id);
+        const { parsedArg1: ParsedStayId, parsedArg2: parsedRoomId} = parsedIds(stayId, roomId);
 
         const room = await prisma.stayRoom.findUnique({
-            where: { id: room_id }
+            where: { 
+                id: parsedRoomId,
+                stay_id: ParsedStayId
+            },
+            include: {
+                stay: {
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true
+                    }
+                }
+            }
         });
+        if(!room) return successResponse({}, 'No room found reletd to this stay', 404);
 
         return successResponse( room,'Room found successfully');
     } catch (error) {
@@ -35,37 +41,33 @@ export async function GET(req: NextRequest, context: {
 };
 
 export async function PUT(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ stayId: string, roomId: string}>
 }) {
-    const id = (await context.params).id;
+    const { stayId, roomId} = await context.params;
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
+        const parsedTokenId = Number(token.id);
 
-        const admin = await prisma.user.findUnique({
-            where: { id: Number(token.id)}
-        });
-        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
-
-        const room_id = idSchema.parse(id);
+        const { parsedArg1: ParsedStayId, parsedArg2: parsedRoomId} = parsedIds(stayId, roomId);
 
         const body = await req.json();
         const parsedBody = updateRoomSchema.parse(body);
         const { price, capacity, room_type} = parsedBody;
         if(!price && !capacity && !room_type) return errorResponse('At least one field required for update the room', 400);
 
-        const room = await prisma.stayRoom.findUnique({
-            where: { id: room_id }
+        const existingRoom = await prisma.stayRoom.findUnique({
+            where: { id: parsedRoomId }
         });
-        if(!room) return errorResponse('No Room found', 404);
+        if(existingRoom && existingRoom.stay_id !== ParsedStayId) return errorResponse('Forbidden - you can not update this room', 403);
 
-        const stay = await prisma.stay.findUnique({
+        const existingStay = await prisma.stay.findUnique({
             where: {
-                id: room.stay_id
+                id: ParsedStayId
             }
-        })
-        if(!stay) return errorResponse('Stay not found', 404);
+        });
+        if(existingStay && existingStay.owner_id !== parsedTokenId) return errorResponse('Forbidden - you can not update this room', 403);
 
         const updatedData: any = {};
         if(price !== undefined) updatedData.price = price;
@@ -73,7 +75,7 @@ export async function PUT(req: NextRequest, context: {
         if(room_type !== undefined) updatedData.room_type = room_type;
 
         const updatedRoom = await prisma.stayRoom.update({
-            where: { id: room_id },
+            where: { id: parsedRoomId },
             data: updatedData
         });
 
@@ -85,25 +87,32 @@ export async function PUT(req: NextRequest, context: {
 };
 
 export async function DELETE(req: NextRequest, context: {
-    params: Promise<{ id: string}>
+    params: Promise<{ stayId: string, roomId: string}>
 }) {
-    const id = (await context.params).id;
+    const { stayId, roomId} = await context.params;
 
     try {
         const token = await getToken({req});
         if(!token?.id) return errorResponse('Unauthorized - token not found');
+        const parsedTokenId = Number(token.id);
 
-        const admin = await prisma.user.findUnique({
-            where: { id: Number(token.id)}
+        const { parsedArg1: ParsedStayId, parsedArg2: parsedRoomId} = parsedIds(stayId, roomId);
+
+        const existingRoom = await prisma.stayRoom.findUnique({
+            where: { id: parsedRoomId }
         });
-        if(admin && admin.role !== 'ADMIN') return errorResponse('Unauthorized request - Admin protected routes', 401);
+        if(existingRoom && existingRoom.stay_id !== ParsedStayId) return errorResponse('Forbidden - you can not update this room', 403);
 
-        const room_id = idSchema.parse(id);
+        const existingStay = await prisma.stay.findUnique({
+            where: {
+                id: ParsedStayId
+            }
+        });
+        if(existingStay && existingStay.owner_id !== parsedTokenId) return errorResponse('Forbidden - you can not update this room', 403);
 
         const deletedStayRoom = await prisma.stayRoom.delete({
-            where: { id: room_id }
+            where: { id: parsedRoomId }
         });
-        if(!deletedStayRoom) return errorResponse('Room not found', 404);
         
         return successResponse(deletedStayRoom, 'Room deleted successfully');
     } catch (error) {
